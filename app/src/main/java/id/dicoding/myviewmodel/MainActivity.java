@@ -1,6 +1,8 @@
 package id.dicoding.myviewmodel;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -28,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText edtCity;
     private ProgressBar progressBar;
     private Button btnCity;
+    private MainViewModel mainViewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
         adapter.notifyDataSetChanged();
         recyclerView.setAdapter(adapter);
 
+        mainViewModel = new ViewModelProvider(this, new ViewModelProvider.NewInstanceFactory()).get(MainViewModel.class);
+
         btnCity.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -52,7 +57,17 @@ public class MainActivity extends AppCompatActivity {
                 if (TextUtils.isEmpty(city)) return;
 
                 showLoading(true);
-                setWeather(city);
+                mainViewModel.setWeather(city);
+            }
+        });
+
+        mainViewModel.getWeathers().observe(this, new Observer<ArrayList<WeatherItems>>() {
+            @Override
+            public void onChanged(ArrayList<WeatherItems> weatherItems) {
+                if (weatherItems != null){
+                    adapter.setData(weatherItems);
+                    showLoading(false);
+                }
             }
         });
     }
@@ -63,46 +78,5 @@ public class MainActivity extends AppCompatActivity {
         } else {
             progressBar.setVisibility(View.GONE);
         }
-    }
-
-    public void setWeather(final String cities){
-        final ArrayList<WeatherItems> listItems = new ArrayList<>();
-
-        String apiKey = "4fd84305fb0f6c588a1f00991b3a73b5";
-        String url = "https://api.openweathermap.org/data/2.5/group?id="+cities+"&units=metric&appid="+apiKey;
-
-        AsyncHttpClient client = new AsyncHttpClient();
-        client.get(url, new AsyncHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, byte[] responseBody) {
-                try {
-                    String result = new String(responseBody);
-                    JSONObject responseObject = new JSONObject(result);
-                    JSONArray list = responseObject.getJSONArray("list");
-
-                    for (int i=0; i<list.length(); i++){
-                        JSONObject weather = list.getJSONObject(i);
-                        WeatherItems weatherItems = new WeatherItems();
-                        weatherItems.setId(weather.getInt("id"));
-                        weatherItems.setName(weather.getString("name"));
-                        weatherItems.setCurrentWeather(weather.getJSONArray("weather").getJSONObject(0).getString("main"));
-                        weatherItems.setDescription(weather.getJSONArray("weather").getJSONObject(0).getString("description"));
-                        double tempInKelvin = weather.getJSONObject("main").getDouble("temp");
-                        double tempInCelsius= tempInKelvin - 273;
-                        weatherItems.setTemperature(new DecimalFormat("##.##").format(tempInCelsius));
-                        listItems.add(weatherItems);
-                    }
-                    adapter.setData(listItems);
-                    showLoading(false);
-                } catch (Exception e){
-                    Log.d("Exception", e.getMessage());
-                }
-            }
-
-            @Override
-            public void onFailure(int statusCode, Header[] headers, byte[] responseBody, Throwable error) {
-                Log.d("onFailure", error.getMessage());
-            }
-        });
     }
 }
